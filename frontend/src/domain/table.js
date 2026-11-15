@@ -368,65 +368,70 @@ export function toAnswers(base, actions) {
 
 // ---- text --------------------------------------------------------------------------------------
 
-/** Label and text for one action, given the table before it. */
-export function describeAction(before, a) {
-  const name = (s) => before.players[s] ?? `#${s}`
-  const label = before.street && before.street !== 'over' ? cap(before.street) : ''
-  const skipped = a.seat != null ? before.queue.slice(0, before.queue.indexOf(a.seat)) : []
-  const lead = skipped.length ? `${skipped.map(name).join(', ')} ${before.highest > (before.status[skipped[0]]?.bet ?? 0) ? 'fold' : 'check'} · ` : ''
-  switch (a.type) {
-    case 'seats':
-      return { label: 'Sitting Out', text: a.out.length ? a.out.map(name).join(', ') : 'Nobody' }
-    case 'dealer':
-      return { label: 'Dealer', text: name(a.seat) }
-    case 'straddle':
-      return { label, text: `${name(toAct(before))} straddles ${before.straddleSize}` }
-    case 'fold':
-      return { label, text: `${lead}${name(a.seat)} folds` }
-    case 'call':
-      return { label, text: `${lead}${name(a.seat)} ${toCall(before, a.seat) > 0 ? `calls ${before.highest}` : 'checks'}` }
-    case 'raise':
-      return { label, text: `${lead}${name(a.seat)} ${before.highest === 0 ? 'bets' : 'raises to'} ${a.amount}` }
-    case 'rest-fold': {
-      const after = apply(before, a)
-      const folded = before.queue.filter((s) => after.status[s].folded && !before.status[s].folded)
-      return { label, text: `${folded.map(name).join(', ')} fold` }
-    }
-    case 'next-street': {
-      const after = apply(before, a)
-      const folded = before.queue.filter((s) => after.status[s].folded)
-      const checked = before.queue.filter((s) => toCall(before, s) === 0)
-      const parts = [checked.length && `${checked.map(name).join(', ')} check`, folded.length && `${folded.map(name).join(', ')} fold`].filter(Boolean)
-      return { label, text: parts.join(' · ') || 'Nobody left to act' }
-    }
-    case 'rest-call':
-      return { label, text: `${before.queue.map(name).join(', ')} ${before.queue.some((s) => toCall(before, s) > 0) ? 'call' : 'check'}` }
-    case 'end':
-      return { label: 'Ended', text: cap(before.street) }
-    case 'cards-who':
-      return { label: 'Shown', text: `${name(a.seat)} · …` }
-    case 'cards':
-      return { label: 'Shown', text: `${name(before.pendingSeat)} · ${handLabel(a.cards)}` }
-    case 'board':
-      return { label: 'Board', text: a.cards.length ? a.cards.map(cardLabel).join(' ') : 'Cleared' }
-    default:
-      return { label, text: a.type }
-  }
-}
-
-/** One row per action for the log, with the state before each (so the rows read like the hand). Each row covers
- *  `actions[start, end)`: a hand shown is one row for the player and their cards. */
+/**
+ * The hand as what happened, one row per outcome: who sat out, the dealer, each street's betting with players who did
+ * the same thing in a row merged ("Roni, Gil, Tal fold", "Shay, Dani call 25"), a bet or raise per row, each street's
+ * board as one row with the cards in effect, the end of the hand and each hand shown. Each row covers the entries
+ * `actions[start, end)` that made it (rows can share an entry: tapping a later player folds the ones before them into
+ * the previous row); `board: true` marks a board row (changed with the card picker, not by entering it again).
+ */
 export function log(base, actions) {
   const rows = []
+  const name = (s) => base.players[s] ?? `#${s}`
+  const names = (r) => r.seats.map(name).join(', ')
+  const verb = { fold: ['folds', 'fold'], check: ['checks', 'check'], call: ['calls', 'call'] }
+  const text = (r) => (r.group ? `${names(r)} ${verb[r.group][r.seats.length > 1 ? 1 : 0]}${r.group === 'call' ? ` ${r.amount}` : ''}` : r.text)
   let t = base
+  let boardAt = null // index of the board entry in effect
   actions.forEach((a, i) => {
-    rows.push({ ...describeAction(t, a), start: i, end: i + 1 })
+    const before = t
     t = apply(t, a)
+    const one = (label, txt) => rows.push({ label, text: txt, start: i, end: i + 1 })
+    switch (a.type) {
+      case 'seats':
+        return one('Sitting Out', a.out.length ? a.out.map(name).join(', ') : 'Nobody')
+      case 'dealer':
+        return one('Dealer', name(a.seat))
+      case 'board':
+        boardAt = i
+        return undefined
+      case 'end':
+        return one('Ended', cap(before.street))
+      case 'cards-who':
+        return one('Shown', `${name(a.seat)} · …`)
+      case 'cards': {
+        const last = rows[rows.length - 1]
+        if (actions[i - 1]?.type === 'cards-who' && last?.label === 'Shown') rows.pop()
+        return rows.push({ label: 'Shown', text: `${name(before.pendingSeat)} · ${handLabel(a.cards)}`, start: actions[i - 1]?.type === 'cards-who' ? i - 1 : i, end: i + 1 })
+      }
+      default: {
+        const street = before.street
+        for (const e of seatEvents(before, a)) {
+          const last = rows[rows.length - 1]
+          const group = ['fold', 'check', 'call'].includes(e.kind) ? e.kind : null
+          if (group && last?.street === street && last.group === group && (group !== 'call' || last.amount === e.amount)) {
+            last.seats.push(e.seat)
+            last.end = i + 1
+          } else if (group) {
+            rows.push({ label: cap(street), street, group, seats: [e.seat], amount: e.amount, start: i, end: i + 1 })
+          } else {
+            const txt = { straddle: `${name(e.seat)} straddles ${e.amount}`, bet: `${name(e.seat)} bets ${e.amount}`, raise: `${name(e.seat)} raises to ${e.amount}` }[e.kind]
+            rows.push({ label: cap(street), street, text: txt, start: i, end: i + 1 })
+          }
+        }
+        return undefined
+      }
+    }
   })
-  return rows.filter((r, i) => {
-    if (actions[i].type === 'cards' && actions[i - 1]?.type === 'cards-who') rows[i].start = i - 1
-    return !(actions[i].type === 'cards-who' && actions[i + 1]?.type === 'cards')
-  })
+  // Each street's board goes first among that street's rows (or after the betting so far, if nothing happened on it yet).
+  const cards = { flop: t.board.slice(0, 3), turn: t.board.slice(3, 4), river: t.board.slice(4, 5) }
+  for (const street of ['flop', 'turn', 'river']) {
+    if (!cards[street].length) continue
+    const row = { label: cap(street), street, text: cards[street].map(cardLabel).join(' '), board: true, start: boardAt, end: boardAt + 1 }
+    const at = rows.findIndex((r) => r.street === street || r.label === 'Ended' || r.label === 'Shown' || (r.street && STREETS.indexOf(r.street) > STREETS.indexOf(street)))
+    rows.splice(at < 0 ? rows.length : at, 0, row)
+  }
+  return rows.map(({ seats, group, amount, ...r }) => ({ ...r, text: text({ seats, group, amount, text: r.text }) }))
 }
 
 // ---- history -----------------------------------------------------------------------------------

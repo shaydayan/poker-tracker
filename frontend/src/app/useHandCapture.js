@@ -108,13 +108,16 @@ export function useHandCapture(initialSession, settings) {
       setActions(Table.reattach(tableBase, next, redo.tail))
       setRedo(null)
     },
-    /** Enter log row `k` again: the hand goes back to just before it; what followed waits until it is done. */
+    /** Enter log row `k` again: the hand goes back to just before its first entry; what followed waits until it is done. */
     redoRow: (k) => {
       const rows = Table.log(tableBase, actions)
       const row = rows[k]
       if (!row || redo) return
       remember()
-      setRedo({ start: row.start, removed: actions.slice(row.start, row.end), row, tail: actions.slice(row.end), tailRows: rows.slice(k + 1) })
+      // Only the row's first entry is entered again (a player and their cards count as one); the rest of the row, if it
+      // merged several entries ("Gil, Tal fold"), waits with what follows and comes back if it still fits.
+      const n = actions[row.start]?.type === 'cards-who' && actions[row.start + 1]?.type === 'cards' ? 2 : 1
+      setRedo({ start: row.start, removed: actions.slice(row.start, row.start + n), row, tail: actions.slice(row.start + n), tailRows: rows.slice(k + 1) })
       setActions(actions.slice(0, row.start))
     },
     /** Give up on the redo: the row and everything after it as they were. */

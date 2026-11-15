@@ -20,12 +20,12 @@ export function AmountControls({ range, bigBlind, current, onAnswer, onCancel })
   )
 }
 
-/** Title row, fixed height. */
-export function StepTitle({ title, hint }) {
+/** Title row, fixed height; `action` (a small button) takes the hint's place on the right. */
+export function StepTitle({ title, hint, action }) {
   return (
-    <div className="flex h-8 shrink-0 items-baseline justify-between px-3">
+    <div className="flex h-8 shrink-0 items-center justify-between px-3">
       <span className="text-lg font-semibold">{title}</span>
-      <span className="text-xs text-muted">{hint}</span>
+      {action ?? <span className="text-xs text-muted">{hint}</span>}
     </div>
   )
 }

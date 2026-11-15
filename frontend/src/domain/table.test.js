@@ -126,7 +126,7 @@ describe('table: edge cases the question flow cannot say directly', () => {
   })
   it('names only the players who actually folded on Rest Fold', () => {
     const t = run(dealt(), { type: 'raise', seat: 6, amount: 25 }, { type: 'call', seat: 1 }, { type: 'rest-fold' }, { type: 'rest-fold' })
-    expect(T.log(table(), t.actions).map((r) => r.text).slice(-2)).toEqual(['Dani, Omer fold', 'Tal fold'])
+    expect(T.log(table(), t.actions).map((r) => r.text).slice(-2)).toEqual(['Dani, Omer fold', 'Tal folds'])
     expect(T.live(t)).toEqual([1])
   })
   it('acting for the last player standing just ends the hand', () => {
@@ -142,13 +142,32 @@ describe('table: log', () => {
     const t = run(dealt(), { type: 'raise', seat: 6, amount: 25 }, { type: 'call', seat: 1 }, { type: 'rest-fold' }, { type: 'raise', seat: 1, amount: 40 }, { type: 'end' }, { type: 'cards-who', seat: 1 }, { type: 'cards', cards: ['Ah', 'Ks'] })
     expect(T.log(table(), t.actions).map((r) => `${r.label}: ${r.text}`)).toEqual([
       'Dealer: Shay',
-      'Preflop: Roni, Gil fold · Tal raises to 25',
+      'Preflop: Roni, Gil fold',
+      'Preflop: Tal raises to 25',
       'Preflop: Shay calls 25',
       'Preflop: Dani, Omer fold',
-      'Flop: Tal check · Shay bets 40',
+      'Flop: Tal checks',
+      'Flop: Shay bets 40',
       'Ended: Flop',
       'Shown: Shay · A♥ K♠',
     ])
+  })
+  it('merges players who did the same thing in a row, however they were entered', () => {
+    // Roni folds, then Tal is tapped (Gil folds on the way) and folds too: one row for all three.
+    const t = run(dealt(), { type: 'fold', seat: 4 }, { type: 'fold', seat: 6 }, { type: 'call', seat: 1 }, { type: 'call', seat: 2 })
+    const rows = T.log(table(), t.actions)
+    expect(rows.map((r) => r.text)).toEqual(['Shay', 'Roni, Gil, Tal fold', 'Shay calls 5', 'Dani checks']) // equal blinds: Dani owes nothing
+    expect(rows.map((r) => [r.start, r.end])).toEqual([[0, 1], [1, 3], [3, 4], [4, 5]])
+    const called = run(dealt(), { type: 'raise', seat: 4, amount: 25 }, { type: 'call', seat: 5 }, { type: 'call', seat: 6 })
+    expect(T.log(table(), called.actions).at(-1)).toMatchObject({ text: 'Gil, Tal call 25', start: 2, end: 4 })
+  })
+  it('shows one board row per street with the cards in effect, first among that street\'s rows', () => {
+    const t = run(dealt(), { type: 'raise', seat: 6, amount: 25 }, { type: 'call', seat: 1 }, { type: 'next-street' }, { type: 'raise', seat: 6, amount: 35 }, { type: 'board', cards: ['Ah', 'Kd'] }, { type: 'board', cards: ['Ah', 'Kd', '7c'] })
+    const rows = T.log(table(), t.actions)
+    expect(rows.filter((r) => r.board)).toHaveLength(1)
+    const flop = rows.findIndex((r) => r.board)
+    expect(rows[flop]).toMatchObject({ label: 'Flop', text: 'A♥ K♦ 7♣', start: 6, end: 7 })
+    expect(rows[flop + 1]).toMatchObject({ label: 'Flop', text: 'Tal bets 35' })
   })
 })
 
@@ -166,7 +185,7 @@ describe('table: next street and board', () => {
   it('lets the big blind check a limped pot instead of folding it', () => {
     const t = run(dealt(), { type: 'call', seat: 4 }, { type: 'next-street' })
     expect(T.live(t)).toEqual([2, 3, 4]) // equal blinds: the small blind owes nothing either
-    expect(T.log(table(), t.actions).at(-1).text).toBe('Dani, Omer check · Gil, Tal, Shay fold')
+    expect(T.log(table(), t.actions).slice(-2).map((r) => r.text)).toEqual(['Gil, Tal, Shay fold', 'Dani, Omer check'])
   })
   it('gives the pot to the bettor when everyone else faces the bet', () => {
     const t = run(dealt(), { type: 'raise', seat: 4, amount: 25 }, { type: 'next-street' })
@@ -217,7 +236,7 @@ describe('table: board cards', () => {
     expect(t.board).toEqual(['Ah', 'Kd', '7c'])
     expect(T.toAct(t)).toBe(T.toAct(plain))
     expect(T.toAnswers(table(), t.actions)).toEqual(T.toAnswers(table(), plain.actions))
-    expect(T.log(table(), t.actions).at(-2)).toMatchObject({ label: 'Board', text: 'A♥ K♦ 7♣' })
+    expect(T.log(table(), t.actions).filter((r) => r.board)).toMatchObject([{ label: 'Flop', text: 'A♥ K♦ 7♣' }])
     expect(T.streetLines(table(), t.actions)[1]).toEqual({ label: 'Flop', text: 'A♥ K♦ 7♣ · Tal bets 35' })
   })
 })
@@ -225,7 +244,7 @@ describe('table: board cards', () => {
 describe('table: entering an action again', () => {
   it('gives each log row the actions it covers, a hand shown as one row', () => {
     const t = run(dealt(), { type: 'raise', seat: 6, amount: 25 }, { type: 'rest-fold' }, { type: 'cards-who', seat: 6 }, { type: 'cards', cards: 'AA' })
-    expect(T.log(table(), t.actions).map((r) => [r.label, r.start, r.end])).toEqual([['Dealer', 0, 1], ['Preflop', 1, 2], ['Preflop', 2, 3], ['Shown', 3, 5]])
+    expect(T.log(table(), t.actions).map((r) => [r.text, r.start, r.end])).toEqual([['Shay', 0, 1], ['Roni, Gil fold', 1, 2], ['Tal raises to 25', 1, 2], ['Shay, Dani, Omer fold', 2, 3], ['Tal · AA', 3, 5]])
   })
   it('puts back the later actions while they still fit and drops the rest', () => {
     const tail = [{ type: 'call', seat: 1 }, { type: 'rest-fold' }, { type: 'raise', seat: 6, amount: 40 }]

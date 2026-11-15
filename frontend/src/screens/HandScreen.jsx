@@ -51,7 +51,7 @@ export function HandScreen({ c }) {
   useEffect(() => { if (redoKind === 'seats') setOutPick(c.redoing.removed[0].out) }, [redoKind]) // eslint-disable-line react-hooks/exhaustive-deps
   const view = redoKind === 'seats'
     ? sitOutView(t, outPick, setOutPick, (out) => act({ type: 'seats', out }))
-    : stepView(t, { actor, raising, act, setActor, setRaising, startShow })
+    : stepView(t, { actor, raising, act, setActor, setRaising, startShow, endHand: run(c.endHand), editing: c.editing, redoing: !!c.redoing })
   // A player picked under Cards Shown?; a half-entered one (after an old redo or undo) is picked already.
   const showing = t.pendingSeat ?? shower
   const showCards = (cards) => {
@@ -76,7 +76,12 @@ export function HandScreen({ c }) {
       <TopBar
         title={c.editing ? `Editing Hand ${t.handNo}` : `Hand ${t.handNo}`}
         subtitle={where}
-        right={<Button className="w-11" onClick={() => setSheet('menu')}>⋯</Button>}
+        right={
+          <>
+            <Button className="w-11" aria-label="Undo" disabled={!c.canUndo} onClick={run(c.undo)}>↶</Button>
+            <Button className="w-11" aria-label="Menu" onClick={() => setSheet('menu')}>⋯</Button>
+          </>
+        }
       />
       <div className="shrink-0 border-b border-line pt-1">
         <SeatMap {...view.map} board={board} />
@@ -84,7 +89,7 @@ export function HandScreen({ c }) {
       <div ref={logRef} className="flex-1 overflow-y-auto">
         {c.log.map((r, i) => (
           <div key={i} data-row={i} className="border-b border-line">
-            <Row label={r.label} text={r.text} trailing={c.redoing ? '' : '↺'} onClick={c.redoing ? undefined : () => { focusRow.current = i; c.redoRow(i); reset() }} />
+            <Row label={r.label} text={r.text} trailing={c.redoing ? '' : '↺'} onClick={c.redoing ? undefined : r.board ? openBoard : () => { focusRow.current = i; c.redoRow(i); reset() }} />
           </div>
         ))}
         {c.redoing && (
@@ -101,14 +106,14 @@ export function HandScreen({ c }) {
         )}
       </div>
       <div className="flex shrink-0 flex-col gap-2 border-t border-line pt-1 pb-2" key={`${t.handNo}-${c.actions.length}-${raising}`}>
-        <StepTitle title={view.title} hint={view.hint} />
+        <StepTitle title={view.title} hint={c.redoing ? 'later rows return if they still fit' : view.hint} action={view.action} />
         {view.controls && <div className="flex flex-col gap-2 px-3">{view.controls}</div>}
-      </div>
-      <div className="flex h-16 shrink-0 items-center gap-2 border-t border-line px-2">
-        <Button variant="ghost" className="w-20" disabled={!c.canUndo} onClick={run(c.undo)}>Undo</Button>
-        {c.editing && <Button variant="ghost" className="w-20" onClick={run(c.cancelEdit)}>Cancel</Button>}
-        <div className="flex-1 text-center text-xs text-muted">{c.redoing ? 'Later rows return if they still fit' : c.editing ? 'Changes apply on Save' : `${c.hands.length} saved`}</div>
-        <Button variant="primary" className="w-24" disabled={!!c.redoing} onClick={run(c.editing ? c.saveEdit : c.endHand)}>{c.editing ? 'Save' : c.inCardsPhase ? 'Save Hand' : 'End Hand'}</Button>
+        {c.editing && (
+          <div className="grid grid-cols-2 gap-2 px-3">
+            <Button variant="ghost" className="h-12" onClick={run(c.cancelEdit)}>Cancel</Button>
+            <Button variant="primary" className="h-12" disabled={!!c.redoing} onClick={run(c.saveEdit)}>Save Changes</Button>
+          </div>
+        )}
       </div>
 
       <CardsSheet
@@ -142,7 +147,7 @@ export function HandScreen({ c }) {
 }
 
 /** What to enter now: the dealer, each player's action in turn, then the cards shown. @returns {{ title, hint, map, controls }} */
-function stepView(t, { actor, raising, act, setActor, setRaising, startShow }) {
+function stepView(t, { actor, raising, act, setActor, setRaising, startShow, endHand, editing, redoing }) {
   const names = t.players
   // Everyone at the table is shown; those sitting this hand out are faded, marked Out, and never tappable.
   const outTones = Object.fromEntries(t.out.map((s) => [s, 'fold']))
@@ -150,10 +155,13 @@ function stepView(t, { actor, raising, act, setActor, setRaising, startShow }) {
 
   if (t.street === null) {
     const suggested = t.suggestedDealer
+    const expected = suggested != null && t.seats.includes(suggested)
     return {
       title: 'Dealer?',
-      hint: suggested != null ? `expected: ${names[suggested]}` : 'first hand',
-      map: { ...base, active: t.seats.includes(suggested) ? suggested : undefined, badges: t.seats.includes(suggested) ? { [suggested]: 'D' } : {}, onPick: (seat) => act({ type: 'dealer', seat }) },
+      hint: expected ? '' : 'tap the dealer',
+      // The seat expected to have the button (after last hand's dealer), as a one-tap answer on the question's line.
+      action: expected && <Button size="sm" className="w-28" onClick={() => act({ type: 'dealer', seat: suggested })}>{names[suggested]}</Button>,
+      map: { ...base, active: expected ? suggested : undefined, badges: expected ? { [suggested]: 'D' } : {}, onPick: (seat) => act({ type: 'dealer', seat }) },
       controls: null,
     }
   }
@@ -169,7 +177,8 @@ function stepView(t, { actor, raising, act, setActor, setRaising, startShow }) {
         tones: { ...outTones, ...Object.fromEntries(shown.map((s) => [s, 'primary'])) },
         onPick: startShow, // their cards are picked in a sheet, so nothing on the screen moves
       },
-      controls: null,
+      // Saving moves the button and deals the next hand; a saved hand open for editing has its own Save Changes.
+      controls: editing ? null : <Button variant="primary" className="h-12" disabled={redoing} onClick={endHand}>Save Hand</Button>,
     }
   }
 
@@ -194,7 +203,6 @@ function stepView(t, { actor, raising, act, setActor, setRaising, startShow }) {
       controls: <AmountControls range={Table.amountRange(t)} bigBlind={t.bigBlind} onAnswer={(amount) => act({ type: 'raise', seat, amount })} onCancel={() => setRaising(false)} />,
     }
   }
-  const anyOwed = t.queue.some((s) => Table.toCall(t, s) > 0)
   return {
     title: `${names[seat]}?`,
     hint,
@@ -210,9 +218,9 @@ function stepView(t, { actor, raising, act, setActor, setRaising, startShow }) {
           <Button variant="raise" className="h-14" onClick={() => setRaising(true)}>{t.highest === 0 ? 'Bet' : 'Raise'}</Button>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          {/* Everyone not entered checks if they can, folds if they face a bet. */}
-          <Button variant="ghost" className="h-10" onClick={() => act({ type: 'next-street' })}>{t.street === 'river' ? 'End Betting' : 'Next Street'}</Button>
-          <Button variant="ghost" className="h-10" onClick={() => act({ type: 'rest-call' })}>{anyOwed ? 'Rest Call' : 'Rest Check'}</Button>
+          {/* End Street: everyone not entered checks if they can, folds if they face a bet. End Hand: stop the betting here. */}
+          <Button className="h-12" onClick={() => act({ type: 'next-street' })}>End Street</Button>
+          <Button className="h-12" disabled={redoing} onClick={endHand}>End Hand</Button>
         </div>
       </>
     ),
