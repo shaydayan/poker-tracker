@@ -53,23 +53,24 @@ cd frontend && npm test
 
 ## Screens
 
-Four tabs at the bottom:
+Four tabs along the top:
 
 - **Settings** — your name (saved as you type; on a fresh app it's the first thing to fill in), blinds, straddle, default raise sizes (open raise, open over a straddle, 3-bet ×, 4-bet+ ×, postflop raise ×), the other players (you're not in that list) and backup. Every change saves on the spot.
-- **History** — every finished session; tap one to see its hands (one line each, naming who raised and who called), and tap a hand to see it street by street.
-- **Session** — with no session running: the New Session page, a transfer list: on the left the table in seat order (you first, then clockwise), on the right the players not seated yet. Tapping a name on the right seats them at the next seat; tapping one on the left (✕) sends them back to their place in the right-hand list; "+ Guest" asks for a name (left empty, it is the first free "Guest N") and seats them. Player names are unique (ignoring case and spaces): Settings and the guest sheet refuse a name already in use. With a session running: its hands so far, one line each ("Tal raises to 25, Shay, Dani call · Flop: Tal bets 40 · Tal wins 120"; tap one to reopen it on the Hand tab) and End Session.
+- **History** — every finished session; tap one to see its hands (one line each, naming who raised and who called), and tap a hand to see it street by street. Long-press a session or a hand to delete it (asks first; a session goes with all its hands; this can't be undone).
+- **Session** — with no session running: the New Session page, a transfer list: on the left the table in seat order (you first, then clockwise), on the right the players not seated yet. Tapping a name on the right seats them at the next seat; tapping one on the left (✕) sends them back to their place in the right-hand list; "+ Guest" asks for a name (left empty, it is the first free "Guest N") and seats them. Player names are unique (ignoring case and spaces): Settings and the guest sheet refuse a name already in use. With a session running: its hands so far, one line each ("Tal raises to 25, Shay, Dani call · Flop: Tal bets 40 · Tal wins 120"; tap one to reopen it on the Hand tab; long-press one to delete it, which Undo on the Hand tab reverses) and End Session.
 - **Hand** — the hand being captured. A half-captured hand survives switching tabs.
 
 ## Capturing a hand
 
-The table is the input. The **seat map** stays pinned at the bottom: you at the bottom, the others clockwise, the dealer marked **D**, and the board in the middle: five card places, filled as the flop (3), turn (4) and river (5) are dealt, with the street and pot under them. Tap the board to pick its actual cards (optional): a 13×4 picker, cards in the order dealt (3 for the flop, then the turn, then the river), changeable any time; they show on the board, in the log and in the history ("Flop: J♥ 7♣ 2♦ · Checked through").
+The table is the input. The **seat map** sits at the top, under the tabs, with the hand's log below it and the current question under the log: you at the bottom, the others clockwise, the dealer marked **D**, and the board in the middle: five card places, filled as the flop (3), turn (4) and river (5) are dealt, with the street and pot under them. Tap the board to pick its actual cards (optional): a 13×4 picker, cards in the order dealt (3 for the flop, then the turn, then the river), changeable any time; they show on the board, in the log and in the history ("Flop: J♥ 7♣ 2♦ · Checked through").
 
-1. **Dealer?** The seat expected to hold the button (after the previous hand) is highlighted; tap it or any other.
-2. The seat to act is lit and the controls say what they can do: **Fold**, **Check** or **Call N**, **Bet** or **Raise** (slider), and **Straddle** for the first player preflop. Each seat shows what it did this street (SB, BB, Str 10, Fold, Check, Call 25, Raise 75, Bet 40); folded seats fade out.
-3. Tapping a later seat acts for them and resolves the seats in between in one go: they fold when facing a bet, check otherwise ("Roni, Gil fold · Tal raises to 25").
-4. **Next Street** (End Betting on the river) does the same for everyone still to act: who can check checks, who faces a bet folds, and the next street is dealt. **Rest Call** (or Rest Check) has them all call instead.
-5. When one player is left, or after the river, the hand goes to **Cards Shown?**: tap any player and pick their two exact cards on the same 13×4 card picker as the board (in a sheet over the screen; cards already on the board or in another hand are greyed out), for as many players as showed. Cancel closes it. The cards show face up beside the player's seat, like the board, so the seat keeps its own text. Stats keep the hand as its notation (A♥ K♦ → AKo).
-6. **Save Hand** moves the button and deals the next hand. **End Hand** stops the betting at any point and goes to Cards Shown?.
+1. **Sitting Out** is the first row of every hand: who sits this hand out ("Nobody", or their names), carried over from the hand before, so it costs no tap. They stay on the table faded and marked Out, and the hand is played without them. You can sit out too; the hand is still recorded ("You sit out" in the header). Change it from the **⋯** menu (this hand while nothing else is entered, otherwise from the next hand), or tap the row to change this hand, saved hands included: the rows after it come back if they still fit. At least two must play.
+2. **Dealer?** The seat expected to hold the button (after the previous hand) is highlighted; tap it or any other.
+3. The seat to act is lit and the controls say what they can do: **Fold**, **Check** or **Call N**, **Bet** or **Raise** (slider), and **Straddle** for the first player preflop. Each seat shows what it did this street (SB, BB, Str 10, Fold, Check, Call 25, Raise 75, Bet 40); folded seats fade out.
+4. Tapping a later seat acts for them and resolves the seats in between in one go: they fold when facing a bet, check otherwise ("Roni, Gil fold · Tal raises to 25").
+5. **Next Street** (End Betting on the river) does the same for everyone still to act: who can check checks, who faces a bet folds, and the next street is dealt. **Rest Call** (or Rest Check) has them all call instead.
+6. When one player is left, or after the river, the hand goes to **Cards Shown?**: tap any player and pick their two exact cards on the same 13×4 card picker as the board (in a sheet over the screen; cards already on the board or in another hand are greyed out), for as many players as showed. Cancel closes it. The cards show face up beside the player's seat, like the board, so the seat keeps its own text. Stats keep the hand as its notation (A♥ K♦ → AKo).
+7. **Save Hand** moves the button and deals the next hand. **End Hand** stops the betting at any point and goes to Cards Shown?.
 
 The log above the controls reads like the hand, one row per action. Tap a row (↺) to enter that action again: the rows after it wait faded below and come back once it is done, as long as they still fit (the first one that no longer fits is dropped, with everything after it). Each betting action keeps the street it was taken on, so after an edit it is dropped rather than moved to another street (a flop bet never comes back as a preflop re-raise); tap the old row (↩) to keep it as it was. This works the same on a saved hand reopened from the Session tab. **Undo** steps back one change of any kind (an action, saving or skipping a hand, sitting a player out, opening or saving a past hand), up to 200 steps back; undoing a save takes the hand out of the saved list again.
 
@@ -77,7 +78,7 @@ Saved hands keep their table actions; the session and history lines are built fr
 
 Raise slider: the steps are 1 big blind at the start, then 2, then 4 and so on, so the amount is always a multiple of the big blind. Defaults: open raise from settings (bigger over a straddle), 3-bet 3x the raise, 4-bet and above 2x; after the flop a bet is half the pot and a raise is 2x the bet.
 
-Your own cards are the ones you enter for your seat under Cards Shown? (optional); the hand lists show them as notation ("#2 QQ"). The **⋯** menu sits a player out or back in. Reopening a saved hand (from the Session tab) loads its actions, to change row by row; Save or Cancel returns to the hand in progress.
+Your own cards are the ones you enter for your seat under Cards Shown? (optional); the hand lists show them as notation ("#2 QQ"). The **⋯** menu sits a player (or you) out or back in. Reopening a saved hand (from the Session tab) loads its actions, to change row by row; Save or Cancel returns to the hand in progress.
 
 ## Architecture (frontend)
 
@@ -100,7 +101,7 @@ All persistence goes through the ports in `src/domain/ports.js`; nothing else to
 Data lives in IndexedDB on the device (`src/storage/indexeddb.js`), so a hand survives closing the app, the phone restarting, and app updates.
 
 - **Saved hands keep the raw table actions** (who did what, on which street), the board and the cards shown. Stats added later are computed from these actions, so they cover every session captured before them; nothing a later stat needs is thrown away.
-- **Every saved hand carries a `format` number** (`HAND_FORMAT` in `domain/record.js`), and the database has a schema version. A change to either must keep reading what was saved before: bump the number and add a migration; never drop or rewrite stored hands.
+- **Every saved hand carries a `format` number** (now 2: the hand's base lists everyone at the table and a first 'seats' action says who sat out; format-1 hands, without it, read as everyone playing) (`HAND_FORMAT` in `domain/record.js`), and the database has a schema version. A change to either must keep reading what was saved before: bump the number and add a migration; never drop or rewrite stored hands.
 - **The hand in progress is saved on every tap** as a draft for its session, and comes back when the app is opened again.
 - **Writes count only once committed** (strict durability), and the app asks the browser to keep its data even when space runs low.
 - **Backup** (Settings): Export saves everything as one JSON file (`poker-tracker-YYYY-MM-DD.json`; keep it in Drive or email it); Import shows what a file holds and, on confirm, replaces everything on the device with it. The backup file has its own `format` number; newer versions of the app keep reading older files.

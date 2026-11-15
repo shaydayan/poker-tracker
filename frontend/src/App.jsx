@@ -1,4 +1,4 @@
-// Screen router: four tabs. Phone-width column, centred when viewed on a desktop browser.
+// Screen router: four tabs along the top. Phone-width column, centred when viewed on a desktop browser.
 import { useEffect, useState } from 'react'
 import { useStorage } from './app/StorageContext.jsx'
 import { TabBar } from './components/TabBar.jsx'
@@ -40,7 +40,9 @@ export default function App() {
 
   if (!tab) return null
   return (
-    <div className="mx-auto flex h-full w-full max-w-[430px] flex-col bg-bg">
+    // The safe-area padding keeps the app clear of the phone's status bar and gesture bar when it runs installed.
+    <div className="mx-auto flex h-full w-full max-w-[430px] flex-col bg-bg pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      <TabBar tabs={TABS} value={tab} onChange={setTab} />
       <div className="relative min-h-0 flex-1">
         {tab === 'settings' && <SettingsScreen onChange={setSettings} />}
         {tab === 'history' && <HistoryScreen />}
@@ -57,7 +59,6 @@ export default function App() {
         )}
         {session && <ActiveSession key={session.id} session={session} settings={settings} tab={tab} onShowHand={() => setTab('hand')} onEndSession={endSession} />}
       </div>
-      <TabBar tabs={TABS} value={tab} onChange={setTab} />
     </div>
   )
 }

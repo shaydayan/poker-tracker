@@ -60,6 +60,23 @@ describe('IndexedDB storage', () => {
   })
 })
 
+describe('deleting', () => {
+  it('removes a session with its hands and draft, and nothing else', async () => {
+    const { idb, storage } = fresh()
+    for (const id of [1, 2]) {
+      await storage.sessions.save({ id, date: '2026-11-15', seats: [], ended: true })
+      await storage.hands.save({ id: `${id}-1`, sessionId: id })
+      await storage.hands.save({ id: `${id}-2`, sessionId: id })
+      await storage.drafts.save({ sessionId: id, actions: [] })
+    }
+    await storage.sessions.remove(1)
+    const after = await createIndexedDbStorage(idb, {}).backup.dump()
+    expect(after.sessions.map((s) => s.id)).toEqual([2])
+    expect(after.hands.map((h) => h.id)).toEqual(['2-1', '2-2'])
+    expect(after.drafts.map((d) => d.sessionId)).toEqual([2])
+  })
+})
+
 describe('backup', () => {
   it('round-trips everything through the file into an empty device', async () => {
     const source = createMemoryStorage() // the sample roster, session and hands

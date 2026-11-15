@@ -52,6 +52,11 @@ export function createMemoryStorage() {
     },
     sessions: {
       save: async (s) => void (sessions = upsert(sessions, s)),
+      remove: async (id) => {
+        sessions = sessions.filter((s) => s.id !== id)
+        hands = hands.filter((h) => h.sessionId !== id)
+        drafts = drafts.filter((d) => d.sessionId !== id)
+      },
       current: async () => sessions.find((s) => !s.ended) ?? null,
       list: async () => [...sessions],
     },

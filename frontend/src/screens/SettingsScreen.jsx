@@ -2,7 +2,7 @@
 import { useRef, useState } from 'react'
 import { useSettings } from '../app/useSettings.js'
 import { useBackup } from '../app/useBackup.js'
-import { Sheet } from '../components/Sheet.jsx'
+import { ConfirmSheet } from './ConfirmSheet.jsx'
 import { Button } from '../components/Button.jsx'
 import { Field } from '../components/Field.jsx'
 import { TopBar } from '../components/TopBar.jsx'
@@ -78,18 +78,13 @@ export function SettingsScreen({ onChange }) {
         <div className="mt-1 h-4 text-xs text-raise">{b.error ?? ''}</div>
       </div>
 
-      <Sheet open={b.pending !== null} title="Import Backup" onClose={b.cancel}>
-        {b.pending && (
-          <div className="mb-4 text-sm">
-            {`Replace everything on this device with the backup${b.pending.exportedAt ? ` from ${b.pending.exportedAt.slice(0, 10)}` : ''}: `}
-            {`${b.pending.data.players.length} players, ${b.pending.data.sessions.length} sessions, ${b.pending.data.hands.length} hands. This can't be undone.`}
-          </div>
-        )}
-        <div className="grid grid-cols-2 gap-2">
-          <Button variant="ghost" onClick={b.cancel}>Cancel</Button>
-          <Button variant="danger" onClick={b.restore}>Replace</Button>
-        </div>
-      </Sheet>
+      <ConfirmSheet
+        title="Import Backup"
+        message={b.pending && `Replace everything on this device with the backup${b.pending.exportedAt ? ` from ${b.pending.exportedAt.slice(0, 10)}` : ''}: ${b.pending.data.players.length} players, ${b.pending.data.sessions.length} sessions, ${b.pending.data.hands.length} hands. This can't be undone.`}
+        action="Replace"
+        onConfirm={b.restore}
+        onCancel={b.cancel}
+      />
     </div>
   )
 }

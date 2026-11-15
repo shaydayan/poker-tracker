@@ -1,7 +1,7 @@
-// Bottom tab bar: equal-width tabs, the current one in accent. Fixed height.
+// Tab bar along the top of the app: equal-width tabs, the current one in accent. Fixed height.
 export function TabBar({ tabs, value, onChange }) {
   return (
-    <div className="flex h-14 shrink-0 border-t border-line bg-bg">
+    <div className="flex h-12 shrink-0 border-b border-line bg-bg">
       {tabs.map((t) => (
         <button
           key={t.id}

@@ -4,7 +4,8 @@
 // settings: { get(): Promise<Settings>, save(settings): Promise<void> }
 // players:  { list(): Promise<Player[]>, add(name): Promise<Player>, rename(id, name): Promise<void>, remove(id): Promise<void> }
 //           (you are a player too, the one settings.heroPlayerId points at; the Players list in Settings leaves you out)
-// sessions: { save(session): Promise<void>, current(): Promise<Session|null> (the one not ended), list(): Promise<Session[]> }
+// sessions: { save(session): Promise<void>, remove(id): Promise<void> (with its hands and draft), current(): Promise<Session|null>
+//           (the one not ended), list(): Promise<Session[]> }
 // hands:    { save(record): Promise<void>, remove(id): Promise<void>, listBySession(sessionId): Promise<HandRecord[]> }
 //           HandRecord = { format, id, sessionId, handNo, base, actions, heroCards, hand } (see domain/record.js)
 // drafts:   { get(sessionId): Promise<Draft|null>, save(draft): Promise<void>, remove(sessionId): Promise<void> }

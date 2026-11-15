@@ -62,6 +62,19 @@ export function createIndexedDbStorage(idb, nav = globalThis.navigator) {
     },
     sessions: {
       save: (session) => write('sessions', (s) => s.put(session)).then(() => undefined),
+      /** The session, its hands and its draft, in one transaction: all gone or none. */
+      remove: (id) =>
+        run(['sessions', 'hands', 'drafts'], 'readwrite', (s) => {
+          s.sessions.delete(id)
+          s.drafts.delete(id)
+          s.hands.index('sessionId').openKeyCursor(id).onsuccess = (e) => {
+            const c = e.target.result
+            if (c) {
+              s.hands.delete(c.primaryKey)
+              c.continue()
+            }
+          }
+        }).then(() => undefined),
       current: async () => (await read('sessions', (s) => s.getAll())).find((x) => !x.ended) ?? null,
       list: () => read('sessions', (s) => s.getAll()),
     },

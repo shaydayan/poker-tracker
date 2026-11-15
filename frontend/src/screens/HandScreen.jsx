@@ -1,5 +1,5 @@
-// The screen that stays open all evening: the hand's log on top, what to enter now in the middle, and the table pinned
-// at the bottom with the board in its centre. The seat to act is lit and one tap says what that player did; tapping a
+// The screen that stays open all evening: the table on top with the board in its centre, the hand's log under it, then
+// what to enter now, and Undo / End Hand at the bottom. The seat to act is lit and one tap says what that player did; tapping a
 // later seat acts for them and resolves the seats in between (fold facing a bet, check otherwise). Tap a log row (↺) to
 // enter it again: the rows after it wait faded and come back once it is done, when they still fit.
 import { useEffect, useRef, useState } from 'react'
@@ -20,6 +20,7 @@ const cap = (s) => s[0].toUpperCase() + s.slice(1)
 export function HandScreen({ c }) {
   const [sheet, setSheet] = useState(null) // 'board' | 'menu'
   const [shower, setShower] = useState(null) // the player whose shown cards are being picked
+  const [outPick, setOutPick] = useState([]) // who sits out, while the Sitting Out row is entered again
   const [pick, setPick] = useState([]) // cards being picked in the board or a player's sheet
   const [actor, setActor] = useState(null) // a seat tapped to act before its turn; null = the seat to act
   const [raising, setRaising] = useState(false) // the amount slider is open
@@ -45,7 +46,12 @@ export function HandScreen({ c }) {
   const run = (fn) => () => { fn(); reset() }
 
   const startShow = (seat) => { setPick([]); setShower(seat) }
-  const view = stepView(t, { actor, raising, act, setActor, setRaising, startShow })
+  // Entering the Sitting Out row again starts from who sat out before.
+  const redoKind = c.redoing?.kind
+  useEffect(() => { if (redoKind === 'seats') setOutPick(c.redoing.removed[0].out) }, [redoKind]) // eslint-disable-line react-hooks/exhaustive-deps
+  const view = redoKind === 'seats'
+    ? sitOutView(t, outPick, setOutPick, (out) => act({ type: 'seats', out }))
+    : stepView(t, { actor, raising, act, setActor, setRaising, startShow })
   // A player picked under Cards Shown?; a half-entered one (after an old redo or undo) is picked already.
   const showing = t.pendingSeat ?? shower
   const showCards = (cards) => {
@@ -54,7 +60,8 @@ export function HandScreen({ c }) {
   }
   const cancelShow = () => (t.pendingSeat !== null ? c.undo() : setShower(null))
   useEffect(() => { if (t.pendingSeat !== null) setPick([]) }, [t.pendingSeat])
-  const where = t.dealerSeat == null ? 'No dealer yet' : `You · ${t.positions[t.heroSeat]} · Dealer ${names[t.dealerSeat]}`
+  const me = t.out.includes(t.heroSeat) ? 'You sit out' : `You · ${t.positions[t.heroSeat]}`
+  const where = t.dealerSeat == null ? (t.out.includes(t.heroSeat) ? 'You sit out · no dealer yet' : 'No dealer yet') : `${me} · Dealer ${names[t.dealerSeat]}`
   const street = Table.streetNow(t)
   const count = Table.boardCount(t)
   const openBoard = () => { setPick(t.board.slice(0, count)); setSheet('board') }
@@ -71,6 +78,9 @@ export function HandScreen({ c }) {
         subtitle={where}
         right={<Button className="w-11" onClick={() => setSheet('menu')}>⋯</Button>}
       />
+      <div className="shrink-0 border-b border-line pt-1">
+        <SeatMap {...view.map} board={board} />
+      </div>
       <div ref={logRef} className="flex-1 overflow-y-auto">
         {c.log.map((r, i) => (
           <div key={i} data-row={i} className="border-b border-line">
@@ -93,9 +103,6 @@ export function HandScreen({ c }) {
       <div className="flex shrink-0 flex-col gap-2 border-t border-line pt-1 pb-2" key={`${t.handNo}-${c.actions.length}-${raising}`}>
         <StepTitle title={view.title} hint={view.hint} />
         {view.controls && <div className="flex flex-col gap-2 px-3">{view.controls}</div>}
-      </div>
-      <div className="shrink-0 border-t border-line pt-1">
-        <SeatMap {...view.map} board={board} />
       </div>
       <div className="flex h-16 shrink-0 items-center gap-2 border-t border-line px-2">
         <Button variant="ghost" className="w-20" disabled={!c.canUndo} onClick={run(c.undo)}>Undo</Button>
@@ -129,7 +136,7 @@ export function HandScreen({ c }) {
         onOk={saveBoard}
         onClose={() => setSheet(null)}
       />
-      <MenuSheet open={sheet === 'menu'} onClose={() => setSheet(null)} session={session} onToggleSitOut={c.toggleSitOut} />
+      <MenuSheet open={sheet === 'menu'} onClose={() => setSheet(null)} session={session} started={c.started || c.editing} onToggleSitOut={c.toggleSitOut} />
     </div>
   )
 }
@@ -137,14 +144,16 @@ export function HandScreen({ c }) {
 /** What to enter now: the dealer, each player's action in turn, then the cards shown. @returns {{ title, hint, map, controls }} */
 function stepView(t, { actor, raising, act, setActor, setRaising, startShow }) {
   const names = t.players
-  const base = { seats: t.seats, names, heroSeat: t.heroSeat, status: Table.seatStatus(t), hands: t.shownHands, badges: t.dealerSeat != null ? { [t.dealerSeat]: 'D' } : {} }
+  // Everyone at the table is shown; those sitting this hand out are faded, marked Out, and never tappable.
+  const outTones = Object.fromEntries(t.out.map((s) => [s, 'fold']))
+  const base = { seats: t.allSeats, names, heroSeat: t.heroSeat, status: Table.seatStatus(t), hands: t.shownHands, tones: outTones, enabled: t.seats, badges: t.dealerSeat != null ? { [t.dealerSeat]: 'D' } : {} }
 
   if (t.street === null) {
     const suggested = t.suggestedDealer
     return {
       title: 'Dealer?',
       hint: suggested != null ? `expected: ${names[suggested]}` : 'first hand',
-      map: { ...base, active: suggested, badges: suggested != null ? { [suggested]: 'D' } : {}, onPick: (seat) => act({ type: 'dealer', seat }) },
+      map: { ...base, active: t.seats.includes(suggested) ? suggested : undefined, badges: t.seats.includes(suggested) ? { [suggested]: 'D' } : {}, onPick: (seat) => act({ type: 'dealer', seat }) },
       controls: null,
     }
   }
@@ -157,7 +166,7 @@ function stepView(t, { actor, raising, act, setActor, setRaising, startShow }) {
       map: {
         ...base,
         enabled: t.seats.filter((s) => !shown.includes(s)), // a player's cards are entered once; tap their row to change them
-        tones: Object.fromEntries(shown.map((s) => [s, 'primary'])),
+        tones: { ...outTones, ...Object.fromEntries(shown.map((s) => [s, 'primary'])) },
         onPick: startShow, // their cards are picked in a sheet, so nothing on the screen moves
       },
       controls: null,
@@ -172,7 +181,7 @@ function stepView(t, { actor, raising, act, setActor, setRaising, startShow }) {
   const hint = skipped.length ? `${skipped.map((s) => names[s]).join(', ')} ${skipWord} first` : ''
   const map = {
     ...base,
-    tones: Object.fromEntries(t.seats.filter((s) => t.status[s].folded).map((s) => [s, 'fold'])),
+    tones: { ...outTones, ...Object.fromEntries(t.seats.filter((s) => t.status[s].folded).map((s) => [s, 'fold'])) },
     enabled: Table.live(t), // folded seats fade out; a live seat that already acted this street just does nothing
     active: seat,
     onPick: (s) => { if (t.queue.includes(s)) { setActor(s); setRaising(false) } },
@@ -225,4 +234,26 @@ function CardsSheet({ open, title, count, hint, value, taken, onChange, left, ok
       </div>
     </Sheet>
   )
+}
+
+/** Who sits this hand out: tap seats to switch them, Done to keep it (at least two must play). */
+function sitOutView(t, out, setOut, onDone) {
+  const playing = t.allSeats.length - out.length
+  return {
+    title: 'Sitting Out?',
+    hint: 'tap to switch',
+    map: {
+      seats: t.allSeats,
+      names: t.players,
+      heroSeat: t.heroSeat,
+      status: Object.fromEntries(out.map((s) => [s, 'Out'])),
+      tones: Object.fromEntries(out.map((s) => [s, 'fold'])),
+      onPick: (s) => setOut(out.includes(s) ? out.filter((x) => x !== s) : [...out, s].sort((a, b) => a - b)),
+    },
+    controls: (
+      <Button variant="primary" className="h-14" disabled={playing < 2} onClick={() => onDone(out)}>
+        {playing < 2 ? 'At Least Two Must Play' : 'Done'}
+      </Button>
+    ),
+  }
 }

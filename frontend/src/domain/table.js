@@ -2,7 +2,7 @@
 // State is rebuilt from the list of actions (undo is a pop), and `toAnswers` maps those actions onto the
 // question-based hand model, so a hand captured either way is saved and analysed the same.
 //
-// Actions: { type: 'dealer', seat } · { type: 'straddle' } · { type: 'fold' | 'call' | 'raise', seat, amount? }
+// Actions: { type: 'seats', out } (who sits this hand out; first, before the dealer) · { type: 'dealer', seat } · { type: 'straddle' } · { type: 'fold' | 'call' | 'raise', seat, amount? }
 //          · { type: 'next-street' } · { type: 'rest-fold' } · { type: 'rest-call' } · { type: 'end' }
 //          · { type: 'board', cards } (the board so far, up to five cards like "Ah"; replaces the one before)
 //          · { type: 'cards', cards } is a player's two exact cards (["Ah", "Kd"]; older hands saved a notation like "AKs") · { type: 'cards-who', seat } · { type: 'cards', cards }
@@ -22,7 +22,9 @@ const cap = (s) => s[0].toUpperCase() + s.slice(1)
 export function createTable({ handNo, seats, players, suggestedDealer, heroSeat, settings }) {
   return {
     handNo,
-    seats: [...seats],
+    allSeats: [...seats], // everyone at the table this session
+    seats: [...seats], // the ones playing this hand (all of them unless a 'seats' action sits some out)
+    out: [], // sitting this hand out
     players: { ...players },
     heroSeat,
     suggestedDealer: suggestedDealer ?? null,
@@ -111,6 +113,7 @@ export function seatStatus(t) {
     const st = t.status[s]
     if (st?.last) out[s] = st.last
   }
+  for (const s of t.out) out[s] = 'Out'
   return out
 }
 
@@ -131,6 +134,7 @@ export function withStreets(base, actions) {
 
 /** Whether action `a` can be taken at table `t` (used to put back the actions after one that was entered again). */
 export function isValid(t, a) {
+  if (a.type === 'seats') return t.street === null && t.actions.every((x) => x.type === 'seats') && t.allSeats.length - a.out.length >= 2
   const betting = t.street !== null && t.street !== 'over'
   if (a.street !== undefined && a.street !== t.street) return false // taken on another street (older actions have none)
   switch (a.type) {
@@ -221,6 +225,8 @@ function settle(t) {
 export function apply(t, a) {
   const u = { ...t, actions: [...t.actions, a] }
   switch (a.type) {
+    case 'seats':
+      return { ...u, seats: u.allSeats.filter((s) => !a.out.includes(s)), out: [...a.out] }
     case 'dealer':
       return deal(u, a.seat)
     case 'straddle': {
@@ -320,6 +326,7 @@ export function toAnswers(base, actions) {
         out.push({ step: 'cards', value: Array.isArray(a.cards) ? notation(a.cards) : a.cards }) // the stats model keeps the notation
         break
       case 'board':
+      case 'seats': // who played is the question-model hand's seat list (see domain/record.js)
         break
       default: {
         if (!straddleKnown) {
@@ -368,6 +375,8 @@ export function describeAction(before, a) {
   const skipped = a.seat != null ? before.queue.slice(0, before.queue.indexOf(a.seat)) : []
   const lead = skipped.length ? `${skipped.map(name).join(', ')} ${before.highest > (before.status[skipped[0]]?.bet ?? 0) ? 'fold' : 'check'} · ` : ''
   switch (a.type) {
+    case 'seats':
+      return { label: 'Sitting Out', text: a.out.length ? a.out.map(name).join(', ') : 'Nobody' }
     case 'dealer':
       return { label: 'Dealer', text: name(a.seat) }
     case 'straddle':
@@ -498,6 +507,7 @@ export function streetLines(base, actions) {
     }
   }
   flush()
+  if (t.out.length) lines.unshift({ label: 'Sitting Out', text: t.out.map((s) => t.players[s]).join(', ') })
   const boardOf = { Flop: t.board.slice(0, 3), Turn: t.board.slice(3, 4), River: t.board.slice(4, 5) }
   for (const l of lines) if (boardOf[l.label]?.length) l.text = `${boardOf[l.label].map(cardLabel).join(' ')} · ${l.text}`
   if (isOver(t) && !t.showdown && live(t).length === 1) lines.push({ label: 'Result', text: `${t.players[live(t)[0]]} wins ${potNow(t)}` })
@@ -512,5 +522,6 @@ export function streetLines(base, actions) {
 export function summary(base, actions) {
   const lines = streetLines(base, actions)
   if (!lines.length) return 'Nothing recorded'
-  return lines.map((l) => (l.label === 'Preflop' || l.label === 'Result' ? l.text : `${l.label}: ${l.text}`)).join(' · ')
+  const label = (l) => ({ Preflop: '', Result: '', 'Sitting Out': 'Out: ' })[l.label] ?? `${l.label}: `
+  return lines.map((l) => label(l) + l.text).join(' · ')
 }

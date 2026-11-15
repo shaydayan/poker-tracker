@@ -7,15 +7,19 @@ import { notation } from './cards.js'
 
 /** The shape of a saved hand. Bump it, and teach the readers the older shape, whenever the record changes: hands saved
  *  today must still load (and feed stats) in every later version. The actions are the source; `hand` can be rebuilt. */
-export const HAND_FORMAT = 1
+//  1: base.seats are the seats that played.
+//  2: base.seats are everyone at the table; a first 'seats' action may sit some out (absent = everyone played).
+export const HAND_FORMAT = 2
 
 /** `base` is the hand as created for the session (Hand.createHand), `actions` the table actions (domain/table.js). */
 export function handRecord({ sessionId, base, actions }) {
   const tableBase = Table.fromHand(base)
-  const shown = Table.replay(tableBase, actions).shownHands[base.heroSeat]
+  const end = Table.replay(tableBase, actions)
+  const shown = end.shownHands[base.heroSeat]
   const heroCards = Array.isArray(shown) ? notation(shown) : shown ?? null
   const answers = Table.toAnswers(tableBase, actions)
-  const hand = Hand.setHeroCards(Hand.replay(base, answers).hand, heroCards)
+  // The stats model sees only the seats that played; who sat out stays in the actions.
+  const hand = Hand.setHeroCards(Hand.replay({ ...base, seats: end.seats }, answers).hand, heroCards)
   return { format: HAND_FORMAT, id: `${sessionId}-${base.handNo}`, sessionId, handNo: base.handNo, base, actions, heroCards, hand }
 }
 

@@ -33,6 +33,14 @@ export function withEnded(session) {
   return { ...session, ended: true }
 }
 
+/** The session with exactly `out` sitting out (the next hand starts with them out). */
+export function withSitOuts(session, out) {
+  return { ...session, seats: session.seats.map((s) => ({ ...s, sittingOut: out.includes(s.seat) })) }
+}
+
+/** The seats sitting out now, for the first action of the next hand. */
+export const sitOuts = (session) => session.seats.filter((s) => s.sittingOut).map((s) => s.seat)
+
 export function withSittingOut(session, seatNo, sittingOut) {
   return { ...session, seats: session.seats.map((s) => (s.seat === seatNo ? { ...s, sittingOut } : s)) }
 }

@@ -272,3 +272,36 @@ describe('table: exact shown cards', () => {
     expect(T.usedCards(t)).toEqual(['Jh', '7c', '2d', 'Kd', 'Ah'])
   })
 })
+
+describe('table: sitting out', () => {
+  const out = (seats) => T.apply(table(), { type: 'seats', out: seats })
+  it('plays the hand without the seats sitting out, and shows them as out', () => {
+    const t = T.apply(out([3, 5]), { type: 'dealer', seat: 1 })
+    expect(t.seats).toEqual([1, 2, 4, 6])
+    expect(t.allSeats).toEqual([1, 2, 3, 4, 5, 6])
+    expect(T.seatStatus(t)).toMatchObject({ 2: 'SB', 4: 'BB', 3: 'Out', 5: 'Out' })
+    expect(T.toAct(t)).toBe(6)
+  })
+  it('lets me sit out and still records the hand', () => {
+    const t = run(out([1]), { type: 'dealer', seat: 2 }, { type: 'rest-fold' })
+    expect(t.seats).not.toContain(1)
+    expect(T.isOver(t)).toBe(true)
+  })
+  it('logs and summarises who sat out', () => {
+    const acts = [{ type: 'seats', out: [3] }, { type: 'dealer', seat: 1 }, { type: 'raise', seat: 6, amount: 25 }, { type: 'rest-fold' }]
+    expect(T.log(table(), acts)[0]).toMatchObject({ label: 'Sitting Out', text: 'Omer', start: 0, end: 1 })
+    expect(T.log(table(), [{ type: 'seats', out: [] }])[0].text).toBe('Nobody')
+    expect(T.streetLines(table(), acts)[0]).toEqual({ label: 'Sitting Out', text: 'Omer' })
+    expect(T.summary(table(), acts)).toMatch(/^Out: Omer · /)
+  })
+  it('only takes a sit-out before the dealer, and keeps at least two players', () => {
+    expect(T.isValid(table(), { type: 'seats', out: [2] })).toBe(true)
+    expect(T.isValid(table(), { type: 'seats', out: [2, 3, 4, 5, 6] })).toBe(false)
+    expect(T.isValid(dealt(), { type: 'seats', out: [2] })).toBe(false)
+  })
+  it('drops later actions by a player who now sits out', () => {
+    const acts = [{ type: 'dealer', seat: 1 }, { type: 'raise', seat: 3, amount: 25 }]
+    const kept = T.reattach(table(), [{ type: 'seats', out: [3] }], acts)
+    expect(kept.map((a) => a.type)).toEqual(['seats', 'dealer']) // Omer's raise no longer fits
+  })
+})

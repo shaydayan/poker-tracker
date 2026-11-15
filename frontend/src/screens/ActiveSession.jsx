@@ -9,7 +9,7 @@ export function ActiveSession({ session, settings, tab, onShowHand, onEndSession
   return (
     <>
       <div className={tab === 'session' ? 'h-full' : 'hidden'}>
-        <SessionScreen session={c.session} hands={c.hands} onOpenHand={(r) => { c.openHand(r); onShowHand() }} onEndSession={() => onEndSession(c.session)} />
+        <SessionScreen session={c.session} hands={c.hands} onOpenHand={(r) => { c.openHand(r); onShowHand() }} onDeleteHand={c.deleteHand} onEndSession={() => onEndSession(c.session)} />
       </div>
       <div className={tab === 'hand' ? 'h-full' : 'hidden'}>
         <HandScreen c={c} />
