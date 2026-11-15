@@ -11,7 +11,7 @@ A **Progressive Web App (PWA)**: React + Vite + Tailwind, installed on the phone
 | 1 | Mock capture UI on the Mac, in-memory data | done |
 | 2 | Real on-device storage (IndexedDB), backup file | done |
 | 2b | Stats screens, computed from the saved actions of every session so far | later |
-| 3 | Install on the Android phone as a PWA | in progress: installable and offline, not yet published |
+| 3 | Install on the Android phone as a PWA | done: https://shaydayan.github.io/poker-tracker/ |
 | 4 | Optional: native package via Capacitor, only if the PWA falls short | |
 
 ## Run on the Mac
@@ -39,7 +39,11 @@ The build is an installable web app (PWA):
 - `dist/sw.js`: the offline cache, written at build time by `scripts/offline-cache.js`. It lists every built file, so the whole app is cached on the first visit and opens with no signal. Its name comes from a hash of the build, so a new build replaces the old cache the next time the app is opened online. It caches only the app's files; your data stays in IndexedDB.
 - `base: './'` in `vite.config.js`: every built path is relative, so the same build works at a site's root or under a sub-path.
 
-To install: open the published address in Chrome on the phone, then menu → **Install app** (or Add to Home screen). Installing needs HTTPS, so it works from a host, not from the Mac's Wi-Fi address.
+To install: open https://shaydayan.github.io/poker-tracker/ in Chrome on the phone, then menu → **Install app** (or Add to Home screen). Installing needs HTTPS, so it works from the published address, not from the Mac's Wi-Fi address.
+
+## Publishing
+
+The code is at https://github.com/shaydayan/poker-tracker (public; it holds no data). Every push to `main` runs `.github/workflows/pages.yml`: tests, build, then publish `frontend/dist` to GitHub Pages. A failing test stops the publish. An installed app picks up the new version the next time it is opened online. Data on the phone is never touched by a publish.
 
 Tests (domain logic only):
 
