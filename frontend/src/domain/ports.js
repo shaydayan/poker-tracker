@@ -7,9 +7,9 @@
 // sessions: { save(session): Promise<void>, remove(id): Promise<void> (with its hands and draft), current(): Promise<Session|null>
 //           (the one not ended), list(): Promise<Session[]> }
 // hands:    { save(record): Promise<void>, remove(id): Promise<void>, listBySession(sessionId): Promise<HandRecord[]> }
-//           HandRecord = { format, id, sessionId, handNo, base, actions, heroCards, hand } (see domain/record.js)
+//           HandRecord = { format, id, sessionId, handNo, base, actions, heroCards, hand, note } (see domain/record.js)
 // drafts:   { get(sessionId): Promise<Draft|null>, save(draft): Promise<void>, remove(sessionId): Promise<void> }
-//           Draft = { sessionId, base, actions }: the hand in progress, so closing the app mid-hand loses nothing
+//           Draft = { sessionId, base, actions, note }: the hand in progress, so closing the app mid-hand loses nothing
 // backup:   { dump(): Promise<Data>, restore(data): Promise<void> } (Data = { settings, players, sessions, hands, drafts };
 //           restore replaces everything, all or nothing; see domain/backup.js for the file)
 // persist(): Promise<boolean>: ask the browser to keep the data even when space runs low

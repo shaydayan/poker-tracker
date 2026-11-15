@@ -9,10 +9,12 @@ import { notation } from './cards.js'
  *  today must still load (and feed stats) in every later version. The actions are the source; `hand` can be rebuilt. */
 //  1: base.seats are the seats that played.
 //  2: base.seats are everyone at the table; a first 'seats' action may sit some out (absent = everyone played).
+//     Optional `note` (free text about the hand); hands saved before it have none, read as ''.
 export const HAND_FORMAT = 2
 
-/** `base` is the hand as created for the session (Hand.createHand), `actions` the table actions (domain/table.js). */
-export function handRecord({ sessionId, base, actions }) {
+/** `base` is the hand as created for the session (Hand.createHand), `actions` the table actions (domain/table.js), `note`
+ *  free text about the hand. */
+export function handRecord({ sessionId, base, actions, note = '' }) {
   const tableBase = Table.fromHand(base)
   const end = Table.replay(tableBase, actions)
   const shown = end.shownHands[base.heroSeat]
@@ -20,11 +22,17 @@ export function handRecord({ sessionId, base, actions }) {
   const answers = Table.toAnswers(tableBase, actions)
   // The stats model sees only the seats that played; who sat out stays in the actions.
   const hand = Hand.setHeroCards(Hand.replay({ ...base, seats: end.seats }, answers).hand, heroCards)
-  return { format: HAND_FORMAT, id: `${sessionId}-${base.handNo}`, sessionId, handNo: base.handNo, base, actions, heroCards, hand }
+  return { format: HAND_FORMAT, id: `${sessionId}-${base.handNo}`, sessionId, handNo: base.handNo, base, actions, heroCards, hand, note: note.trim() }
 }
 
-/** Street by street, naming who did what (see Table.streetLines). */
-export const recordLines = (r) => Table.streetLines(Table.fromHand(r.base), r.actions)
+/** The hand's note ('' when none, as in hands saved before notes existed). */
+export const recordNote = (r) => r.note ?? ''
+
+/** Street by street, naming who did what (see Table.streetLines), then the note if there is one. */
+export const recordLines = (r) => {
+  const lines = Table.streetLines(Table.fromHand(r.base), r.actions)
+  return recordNote(r) ? [...lines, { label: 'Note', text: recordNote(r) }] : lines
+}
 
 /** The whole hand on one line, for lists. */
 export const recordSummary = (r) => Table.summary(Table.fromHand(r.base), r.actions)

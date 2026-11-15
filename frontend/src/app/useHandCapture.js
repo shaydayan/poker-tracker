@@ -3,7 +3,8 @@
 // saving a past hand, deleting a saved hand, entering a row again) is one step back on Undo, up to UNDO_LIMIT steps; storage is put back in
 // line on each undo. A row of the log can be entered again: the actions after it come back once it is done, as long as
 // they still fit (domain/table.js `reattach`). The hand in progress is saved as a draft on every change, so closing the
-// app (or the phone restarting) mid-hand loses nothing; it comes back when the session is opened again.
+// app (or the phone restarting) mid-hand loses nothing; it comes back when the session is opened again. Each hand can
+// carry a free-text note, saved with it (changing it is one undo step too).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as Hand from '../domain/hand.js'
 import * as Table from '../domain/table.js'
@@ -33,8 +34,9 @@ export function useHandCapture(initialSession, settings) {
   const [session, setSession] = useState(initialSession)
   const [base, setBase] = useState(() => baseHand(initialSession, settings))
   const [actions, setActions] = useState(() => startActions(initialSession))
+  const [note, setNote] = useState('')
   const [hands, setHands] = useState([])
-  const [editing, setEditing] = useState(null) // { base, actions } of the hand put aside while a saved one is open
+  const [editing, setEditing] = useState(null) // { base, actions, note } of the hand put aside while a saved one is open
   // While a log row is entered again: where it started, its old actions and row, and the actions and rows after it.
   const [redo, setRedo] = useState(null) // { start, removed, row, tail, tailRows }
   const [history, setHistory] = useState([]) // snapshots of everything above, oldest first
@@ -52,31 +54,33 @@ export function useHandCapture(initialSession, settings) {
       if (d && d.base.handNo === initialSession.handNo && d.actions.length) {
         setBase(d.base)
         setActions(d.actions)
+        setNote(d.note ?? '')
       }
     })
     return () => { live = false }
   }, [storage, initialSession.id, initialSession.handNo])
   useEffect(() => {
     if (!draftLoaded.current) return
-    const main = editing ?? { base, actions: redo ? [...actions.slice(0, redo.start), ...redo.removed, ...redo.tail] : actions }
-    const done = main.actions.length ? storage.drafts.save({ sessionId: session.id, base: main.base, actions: main.actions }) : storage.drafts.remove(session.id)
+    const main = editing ?? { base, note, actions: redo ? [...actions.slice(0, redo.start), ...redo.removed, ...redo.tail] : actions }
+    const done = main.actions.length ? storage.drafts.save({ sessionId: session.id, base: main.base, actions: main.actions, note: main.note }) : storage.drafts.remove(session.id)
     done.catch((e) => console.error('Could not save the hand in progress', e))
-  }, [actions, base, editing, redo, session.id, storage])
+  }, [actions, base, editing, note, redo, session.id, storage])
 
   const tableBase = useMemo(() => Table.fromHand(base), [base])
   const table = useMemo(() => Table.replay(tableBase, actions), [tableBase, actions])
   const started = actions.some((a) => a.type !== 'seats') // anything entered beyond who sits out
-  const current = useMemo(() => handRecord({ sessionId: session.id, base, actions }), [session.id, base, actions])
+  const current = useMemo(() => handRecord({ sessionId: session.id, base, actions, note }), [session.id, base, actions, note])
 
   /** Call before every change: the state now becomes the newest undo step. */
   const remember = useCallback(() => {
-    const snap = { session, base, actions, hands, editing, redo }
+    const snap = { session, base, actions, note, hands, editing, redo }
     setHistory((h) => [...h.slice(-(UNDO_LIMIT - 1)), snap])
-  }, [actions, base, editing, hands, redo, session])
+  }, [actions, base, editing, hands, note, redo, session])
 
-  const load = useCallback((b, acts) => {
+  const load = useCallback((b, acts, n = '') => {
     setBase(b)
     setActions(acts)
+    setNote(n)
     setRedo(null)
   }, [])
 
@@ -133,7 +137,7 @@ export function useHandCapture(initialSession, settings) {
       if (!snap) return
       setHistory((h) => h.slice(0, -1))
       setSession(snap.session)
-      load(snap.base, snap.actions)
+      load(snap.base, snap.actions, snap.note)
       setEditing(snap.editing)
       setRedo(snap.redo)
       setHands(snap.hands)
@@ -155,14 +159,14 @@ export function useHandCapture(initialSession, settings) {
     /** Reopen a saved hand in place of the current one; the current one is kept aside until Save or Cancel. */
     openHand: (r) => {
       remember()
-      if (!editing) setEditing({ base, actions })
-      load(r.base, r.actions)
+      if (!editing) setEditing({ base, actions, note })
+      load(r.base, r.actions, r.note ?? '')
     },
     /** Delete a saved hand of this session (one step back on Undo, which saves it again). */
     deleteHand: async (r) => {
       remember()
       if (editing && current.id === r.id) {
-        load(editing.base, editing.actions) // it was open for editing: back to the hand in progress
+        load(editing.base, editing.actions, editing.note) // it was open for editing: back to the hand in progress
         setEditing(null)
       }
       setHands((hs) => hs.filter((x) => x.id !== r.id))
@@ -171,13 +175,19 @@ export function useHandCapture(initialSession, settings) {
     saveEdit: async () => {
       remember()
       await persist()
-      load(editing.base, editing.actions)
+      load(editing.base, editing.actions, editing.note)
       setEditing(null)
     },
     cancelEdit: () => {
       remember()
-      load(editing.base, editing.actions)
+      load(editing.base, editing.actions, editing.note)
       setEditing(null)
+    },
+    /** Replace this hand's note ('' clears it). */
+    saveNote: (text) => {
+      if (text.trim() === note) return
+      remember()
+      setNote(text.trim())
     },
     /** Sit a player out or back in from the menu: this hand too while nothing is entered yet, else from the next hand. */
     toggleSitOut: (seat) => {
@@ -189,7 +199,7 @@ export function useHandCapture(initialSession, settings) {
       setSession(next)
       storage.sessions.save(next)
     },
-  }), [actions, base, current, editing, started, hands, history, load, persist, redo, remember, restart, session, storage, table, tableBase])
+  }), [actions, base, current, editing, started, hands, history, load, note, persist, redo, remember, restart, session, storage, table, tableBase])
 
   return {
     session,
@@ -199,6 +209,7 @@ export function useHandCapture(initialSession, settings) {
     editing: editing !== null,
     table,
     actions,
+    note,
     log: Table.log(tableBase, actions),
     /** The row being entered again and the rows waiting after it; null otherwise. */
     redoing: redo && { row: redo.row, tailRows: redo.tailRows, kind: redo.removed[0]?.type, removed: redo.removed },

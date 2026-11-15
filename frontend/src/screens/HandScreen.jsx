@@ -1,9 +1,11 @@
 // The screen that stays open all evening: the table on top with the board in its centre, the hand's log under it, then
 // what to enter now, and Undo / End Hand at the bottom. The seat to act is lit and one tap says what that player did; tapping a
 // later seat acts for them and resolves the seats in between (fold facing a bet, check otherwise). Tap a log row (↺) to
-// enter it again: the rows after it wait faded and come back once it is done, when they still fit.
+// enter it again: the rows after it wait faded and come back once it is done, when they still fit. ✎ adds a note to the
+// hand; it shows as the last log row.
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '../components/Button.jsx'
+import { Field } from '../components/Field.jsx'
 import { Row } from '../components/Row.jsx'
 import { Sheet } from '../components/Sheet.jsx'
 import { TopBar } from '../components/TopBar.jsx'
@@ -18,7 +20,8 @@ const cap = (s) => s[0].toUpperCase() + s.slice(1)
 
 /** `c` is the capture state from useHandCapture, owned by the parent so it survives switching tabs. */
 export function HandScreen({ c }) {
-  const [sheet, setSheet] = useState(null) // 'board' | 'menu'
+  const [sheet, setSheet] = useState(null) // 'board' | 'menu' | 'note'
+  const [noteText, setNoteText] = useState('') // the note while its sheet is open
   const [shower, setShower] = useState(null) // the player whose shown cards are being picked
   const [outPick, setOutPick] = useState([]) // who sits out, while the Sitting Out row is entered again
   const [pick, setPick] = useState([]) // cards being picked in the board or a player's sheet
@@ -69,6 +72,8 @@ export function HandScreen({ c }) {
     if (pick.join() !== t.board.join()) c.act({ type: 'board', cards: pick })
     setSheet(null)
   }
+  const openNote = () => { setNoteText(c.note); setSheet('note') }
+  const saveNote = (text) => { c.saveNote(text); setSheet(null) }
   const board = { count, cards: t.board, caption: street ? `${cap(street)} · pot ${Table.potNow(t)}` : '', onPick: count > 0 ? openBoard : undefined }
 
   return (
@@ -79,6 +84,7 @@ export function HandScreen({ c }) {
         right={
           <>
             <Button className="w-11" aria-label="Undo" disabled={!c.canUndo} onClick={run(c.undo)}>↶</Button>
+            <Button className="w-11" aria-label="Note" active={!!c.note} onClick={openNote}>✎</Button>
             <Button className="w-11" aria-label="Menu" onClick={() => setSheet('menu')}>⋯</Button>
           </>
         }
@@ -103,6 +109,11 @@ export function HandScreen({ c }) {
               </div>
             ))}
           </>
+        )}
+        {c.note && (
+          <div className="border-b border-line">
+            <Row label="Note" text={c.note} trailing="✎" onClick={openNote} />
+          </div>
         )}
       </div>
       <div className="flex shrink-0 flex-col gap-2 border-t border-line pt-1 pb-2" key={`${t.handNo}-${c.actions.length}-${raising}`}>
@@ -141,6 +152,13 @@ export function HandScreen({ c }) {
         onOk={saveBoard}
         onClose={() => setSheet(null)}
       />
+      <Sheet open={sheet === 'note'} title="Hand Note" onClose={() => setSheet(null)}>
+        <Field label="Note" placeholder="Anything to remember about this hand" value={noteText} autoFocus onChange={(e) => setNoteText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && saveNote(noteText)} />
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <Button variant="ghost" onClick={() => saveNote('')}>Clear</Button>
+          <Button variant="primary" onClick={() => saveNote(noteText)}>Save</Button>
+        </div>
+      </Sheet>
       <MenuSheet open={sheet === 'menu'} onClose={() => setSheet(null)} session={session} started={c.started || c.editing} onToggleSitOut={c.toggleSitOut} />
     </div>
   )
