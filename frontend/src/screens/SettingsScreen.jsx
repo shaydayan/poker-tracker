@@ -1,5 +1,5 @@
-// Your name, blinds, default raise sizes, the saved player roster, and backup. Changes save as you make them.
-import { useRef, useState } from 'react'
+// Your name, blinds, the game's buy-in, default raise sizes, the saved player roster, and backup. Changes save as you make them.
+import { useEffect, useRef, useState } from 'react'
 import { useSettings } from '../app/useSettings.js'
 import { useBackup } from '../app/useBackup.js'
 import { ConfirmSheet } from './ConfirmSheet.jsx'
@@ -11,6 +11,13 @@ export function SettingsScreen({ onChange }) {
   const s = useSettings(onChange)
   const b = useBackup()
   const fileRef = useRef(null)
+  // The picker closed without a file (browsers that report it): stop showing Reading….
+  const { pickCancelled } = b
+  useEffect(() => {
+    const input = fileRef.current
+    input?.addEventListener('cancel', pickCancelled)
+    return () => input?.removeEventListener('cancel', pickCancelled)
+  }, [pickCancelled])
   const [newName, setNewName] = useState('')
   const [heroName, setHeroName] = useState(null) // your name as typed; null = as saved
   const heroValue = heroName ?? s.hero?.name ?? ''
@@ -35,6 +42,11 @@ export function SettingsScreen({ onChange }) {
           <Field label="Small Blind" {...num('smallBlind')} />
           <Field label="Big Blind" {...num('bigBlind')} />
           <Field label="Straddle" {...num('straddle')} />
+        </div>
+        <div className="mt-2 flex gap-2">
+          <Field label="Buy-In" {...num('buyIn')} />
+          <div className="flex-1" />
+          <div className="flex-1" />
         </div>
         <div className="mt-5 mb-1 text-xs text-muted">Default Raises</div>
         <div className="flex gap-2">
@@ -66,7 +78,8 @@ export function SettingsScreen({ onChange }) {
         </div>
         <div className="grid grid-cols-2 gap-2">
           <Button onClick={b.exportFile}>Export Backup</Button>
-          <Button onClick={() => fileRef.current.click()}>Import Backup</Button>
+          {/* Reads "Reading…" from the tap until the file is in (the grid keeps its width). */}
+          <Button disabled={b.reading} onClick={() => { b.picking(); fileRef.current.click() }}>{b.reading ? 'Reading…' : 'Import Backup'}</Button>
         </div>
         <input
           ref={fileRef}

@@ -5,23 +5,30 @@ export function roundToBB(value, bigBlind) {
 }
 
 /**
- * Values a raise slider can land on. Steps start at one big blind and double every `tier` steps
- * (1BB, 1BB, … then 2BB, … then 4BB, …), so small sizes are fine-grained and big ones coarse.
- * The default is always on the ladder even when it falls between steps.
+ * Values a raise slider can land on: the minimum, then round amounts. Steps are 1, 2, 5, 10, 20, 50… big blinds, each
+ * used `tier` times, and every value after the minimum is a multiple of its step (with a 5 big blind: 25, 30 … 65, then
+ * 70, 80 … 140, then 150, 175 …), so a slider started at 25 offers 100, never 105.
  */
-export function raiseLadder({ min, def, max, bigBlind, tier = 8 }) {
-  const out = []
-  let v = min
-  let step = bigBlind
+export function raiseLadder({ min, max, bigBlind, tier = 8 }) {
+  const out = [min]
+  const steps = [1, 2, 5]
+  let k = 0
+  const step = () => bigBlind * steps[k % 3] * 10 ** Math.floor(k / 3)
+  let v = Math.floor(min / step()) * step() + step() // the first multiple of the step above the minimum
   let n = 0
   while (v <= max) {
     out.push(v)
-    v += step
     if (++n === tier) {
-      step *= 2
+      k += 1
       n = 0
+      v = Math.floor(v / step()) * step() // carry on from the next multiple of the larger step
     }
+    v += step()
   }
-  if (!out.includes(def)) out.push(def)
-  return out.sort((a, b) => a - b)
+  return out
+}
+
+/** The ladder value closest to `value` (a suggested size lands on a round amount). */
+export function nearestOnLadder(values, value) {
+  return values.reduce((best, v) => (Math.abs(v - value) < Math.abs(best - value) ? v : best), values[0])
 }

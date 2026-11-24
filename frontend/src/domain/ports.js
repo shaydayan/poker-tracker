@@ -6,8 +6,8 @@
 //           (you are a player too, the one settings.heroPlayerId points at; the Players list in Settings leaves you out)
 // sessions: { save(session): Promise<void>, remove(id): Promise<void> (with its hands and draft), current(): Promise<Session|null>
 //           (the one not ended), list(): Promise<Session[]> }
-// hands:    { save(record): Promise<void>, remove(id): Promise<void>, listBySession(sessionId): Promise<HandRecord[]> }
-//           HandRecord = { format, id, sessionId, handNo, base, actions, heroCards, hand, note } (see domain/record.js)
+// hands:    { save(record): Promise<void>, remove(id): Promise<void>, listBySession(sessionId): Promise<HandRecord[]> } (in hand order)
+//           HandRecord = { format, id, sessionId, handNo, startedAt, base, actions, heroCards, hand, note } (see domain/record.js)
 // drafts:   { get(sessionId): Promise<Draft|null>, save(draft): Promise<void>, remove(sessionId): Promise<void> }
 //           Draft = { sessionId, base, actions, note }: the hand in progress, so closing the app mid-hand loses nothing
 // backup:   { dump(): Promise<Data>, restore(data): Promise<void> } (Data = { settings, players, sessions, hands, drafts };

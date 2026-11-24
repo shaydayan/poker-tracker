@@ -35,6 +35,12 @@ describe('IndexedDB storage', () => {
     expect((await reopened.drafts.get(7)).actions).toEqual([{ type: 'dealer', seat: 2 }])
   })
 
+  it('lists a session\'s hands in hand order (#2 before #10)', async () => {
+    const { storage } = fresh()
+    for (const n of [1, 10, 2]) await storage.hands.save({ format: 2, id: `7-${n}`, sessionId: 7, handNo: n, actions: [] })
+    expect((await storage.hands.listBySession(7)).map((h) => h.handNo)).toEqual([1, 2, 10])
+  })
+
   it('gives new settings their defaults when older saved settings lack them', async () => {
     const { storage } = fresh()
     const { straddle, ...older } = { ...DEFAULT_SETTINGS, heroPlayerId: 3 }

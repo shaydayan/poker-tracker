@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { createHand, currentStep, answer, endHand, END, wentToShowdown, seatStatus, preflopAggressor, raiseCandidates, aggressorFor, potBefore, amountRange, replay, maxCallers, playersIn, callersRaiser, describe as summary } from './hand.js'
 import { positionsFor } from './positions.js'
-import { raiseLadder } from './sizing.js'
+import { nearestOnLadder, raiseLadder } from './sizing.js'
 import { withNextHand } from './session.js'
 
 const players = { 1: 'Shay', 2: 'Dani', 3: 'Omer', 4: 'Roni', 5: 'Gil', 6: 'Tal' }
@@ -26,12 +26,18 @@ describe('positions', () => {
 })
 
 describe('raise ladder', () => {
-  it('steps by one blind, then two, then four', () => {
-    const l = raiseLadder({ min: 10, def: 25, max: 300, bigBlind: 5, tier: 4 })
-    expect(l).toEqual([10, 15, 20, 25, 30, 40, 50, 60, 70, 90, 110, 130, 150, 190, 230, 270])
+  it('starts at the minimum, then only round amounts, the steps growing 1, 2, 5, 10 big blinds', () => {
+    const l = raiseLadder({ min: 25, max: 400, bigBlind: 5, tier: 4 })
+    expect(l).toEqual([25, 30, 35, 40, 45, 50, 60, 70, 80, 100, 125, 150, 175, 200, 250, 300, 350, 400])
+    expect(l).toContain(100)
+    expect(l).not.toContain(105)
   })
-  it('always contains the default', () => {
-    expect(raiseLadder({ min: 10, def: 75, max: 200, bigBlind: 5 })).toContain(75)
+  it('starts from a minimum that is off the steps, and from 0', () => {
+    expect(raiseLadder({ min: 12, max: 40, bigBlind: 5 }).slice(0, 3)).toEqual([12, 15, 20])
+    expect(raiseLadder({ min: 0, max: 30, bigBlind: 5 })).toEqual([0, 5, 10, 15, 20, 25, 30])
+  })
+  it('snaps a suggested size to the nearest value', () => {
+    expect(nearestOnLadder([25, 30, 35, 40, 50, 60], 47)).toBe(50)
   })
 })
 

@@ -3,6 +3,7 @@
 //
 // Schema changes: bump DB_VERSION and add a step to `upgrade` for the old version; never drop or rewrite stored hands.
 import { DEFAULT_SETTINGS } from '../domain/settings.js'
+import { byHandNo } from '../domain/record.js'
 
 const DB_NAME = 'poker-tracker'
 const DB_VERSION = 1
@@ -81,7 +82,8 @@ export function createIndexedDbStorage(idb, nav = globalThis.navigator) {
     hands: {
       save: (record) => write('hands', (s) => s.put(record)).then(() => undefined),
       remove: (id) => write('hands', (s) => s.delete(id)).then(() => undefined),
-      listBySession: (sessionId) => read('hands', (s) => s.index('sessionId').getAll(sessionId)),
+      // Stored in id order ("9-10" before "9-2"), so put back in hand order.
+      listBySession: async (sessionId) => byHandNo(await read('hands', (s) => s.index('sessionId').getAll(sessionId))),
     },
     drafts: {
       get: async (sessionId) => (await read('drafts', (s) => s.get(sessionId))) ?? null,

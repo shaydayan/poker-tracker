@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '../components/Button.jsx'
 import { Row } from '../components/Row.jsx'
 import { TopBar } from '../components/TopBar.jsx'
-import { recordSummary } from '../domain/record.js'
+import { recordLabel, recordSummary } from '../domain/record.js'
 import { ConfirmSheet } from './ConfirmSheet.jsx'
 
 export function SessionScreen({ session, hands, onOpenHand, onDeleteHand, onEndSession }) {
@@ -16,7 +16,7 @@ export function SessionScreen({ session, hands, onOpenHand, onDeleteHand, onEndS
         {hands.length === 0 && <div className="p-3 text-xs text-muted">No hands saved yet.</div>}
         {hands.map((r) => (
           <div key={r.id} className="border-b border-line">
-            <Row label={`#${r.handNo}${r.heroCards ? ` ${r.heroCards}` : ''}`} text={recordSummary(r)} trailing="▸" onClick={() => onOpenHand(r)} onLongPress={() => setDoomed(r)} />
+            <Row label={recordLabel(r)} text={recordSummary(r)} trailing="▸" onClick={() => onOpenHand(r)} onLongPress={() => setDoomed(r)} />
           </div>
         ))}
       </div>

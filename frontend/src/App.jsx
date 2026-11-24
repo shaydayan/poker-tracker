@@ -45,7 +45,9 @@ export default function App() {
       <TabBar tabs={TABS} value={tab} onChange={setTab} />
       <div className="relative min-h-0 flex-1">
         {tab === 'settings' && <SettingsScreen onChange={setSettings} />}
-        {tab === 'history' && <HistoryScreen />}
+        <div className={tab === 'history' ? 'h-full' : 'hidden'}>
+          <HistoryScreen settings={settings} active={tab === 'history'} />
+        </div>
         {!session && (
           <div className={tab === 'session' ? 'h-full' : 'hidden'}>
             <SessionSetupScreen settings={settings} active={tab === 'session'} onStarted={(s) => { setSession(s); setTab('hand') }} />

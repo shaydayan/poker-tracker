@@ -3,8 +3,7 @@
 import { DEFAULT_SETTINGS } from '../domain/settings.js'
 import { createSession, seatRows, withEnded, activeSeats, namesBySeat } from '../domain/session.js'
 import { createHand } from '../domain/hand.js'
-import { handRecord } from '../domain/record.js'
-import { fromHand, withStreets } from '../domain/table.js'
+import { byHandNo, handRecord } from '../domain/record.js'
 
 const FIXTURE_PLAYERS = ['Shay', 'Dani', 'Omer', 'Roni', 'Gil', 'Tal', 'Yossi', 'Noa']
 
@@ -21,7 +20,7 @@ function fixtureSession(players, settings) {
   ]
   const hands = scripts.map(([handNo, script]) => {
     const b = base(handNo, handNo)
-    return handRecord({ sessionId: session.id, base: b, actions: withStreets(fromHand(b), script) })
+    return handRecord({ sessionId: session.id, base: b, actions: script }) // handRecord puts the actions into entries
   })
   return { session, hands }
 }
@@ -63,7 +62,7 @@ export function createMemoryStorage() {
     hands: {
       save: async (h) => void (hands = upsert(hands, h)),
       remove: async (id) => void (hands = hands.filter((h) => h.id !== id)),
-      listBySession: async (sessionId) => hands.filter((h) => h.sessionId === sessionId),
+      listBySession: async (sessionId) => byHandNo(hands.filter((h) => h.sessionId === sessionId)),
     },
     drafts: {
       get: async (sessionId) => drafts.find((d) => d.sessionId === sessionId) ?? null,
@@ -74,7 +73,7 @@ export function createMemoryStorage() {
       dump: async () => structuredClone({ settings, players, sessions, hands, drafts }),
       restore: async (data) => {
         const d = structuredClone(data)
-        settings = d.settings ?? { ...DEFAULT_SETTINGS }
+        settings = { ...DEFAULT_SETTINGS, ...(d.settings ?? {}) }
         players = d.players
         sessions = d.sessions
         hands = d.hands
